@@ -69,7 +69,7 @@ ui_data = {
             <table style="border: 0; position: absolute; bottom: 5px;">
                 <tr style="border: 0;">
                     <td style="border: 0; text-align: left; padding: 0; width: 210px"><p style="margin: 0; opacity: 0.5;">
-                        <a href="https://www.tiangonglca.org/ai">Based on TianGong AI</a></p>
+                        <a href="https://www.tiangong.earth/">Based on TianGong AI</a></p>
                     </td>
                     <td style="border: 0; text-align: right; padding: 0; width: 100px;"><p style="margin: 0; opacity: 0.5;">
                         <a href="https://www.kaiwu.info">Visit Kaiwu</a></p>
@@ -92,11 +92,11 @@ ui_data = {
     "sidebar_file_uploader_error": "None of the files can be analyzed, please check the format!",
     "sidebar_instructions": """
     <span style='font-size: 14px;'>📚 **[Before Starting: Helpful Tips!](https://www.kaiwu.info/learning)**</span><br />
-    <span style='font-size: 12px;padding-left:20px;'>**[开始之前：提示!](https://www.kaiwu.info/zh/learning)**</span><br />
+    <span style='font-size: 12px;padding-left:20px;'>**[开始之前：重要提示!](https://www.kaiwu.info/zh/learning)**</span><br />
     <span style='font-size: 14px;'>💾 Activate data sources to retrieve.</span><br />
     <span style='font-size: 12px;padding-left:20px;'>打开所需的信息来源。</span><br />
-    <span style='font-size: 14px;'>💡 Work as ChatGPT (GPT-4) if no source is active.</span><br />
-    <span style='font-size: 12px;padding-left:20px;'>关闭所有来源就是ChatGPT的GPT-4。</span>
+    <span style='font-size: 14px;'>💡 Work as ChatGPT (GPT-4o) if no source is active.</span><br />
+    <span style='font-size: 12px;padding-left:20px;'>关闭所有来源就是ChatGPT的GPT-4o。</span>
     """,
     "current_chat_title": "Chat History :",
     "chat_ai_avatar": "src/static/kaiwu/logo.png",

@@ -13,13 +13,21 @@ import utils
 import wix_oauth as wix_oauth
 from sensitivity_checker import check_text_sensitivity
 from top_k_mappings import top_k_mappings
-from utils import (StreamHandler, check_password,  # get_faiss_db_api,
-                   count_chat_history, delete_chat_history, fetch_chat_history,
-                   func_calling_chain, get_begin_datetime, get_faiss_db,
-                   initialize_messages, main_chain, random_email,
-                   search_arxiv_docs, search_internet, search_pinecone,
-                   search_uploaded_docs, search_weaviate, search_wiki,
-                   xata_chat_history)
+from utils import (
+    StreamHandler,
+    check_password,
+    count_chat_history,
+    delete_chat_history,
+    fetch_chat_history,
+    func_calling_chain,
+    get_begin_datetime,
+    initialize_messages,
+    main_chain,
+    random_email,
+    search_internet,
+    search_pinecone,
+    xata_chat_history,
+)
 
 ui = ui_config.create_ui_from_config()
 st.set_page_config(page_title=ui.page_title, layout="wide", page_icon=ui.page_icon)
@@ -111,20 +119,23 @@ if "logged_in" in st.session_state:
 
                 # search_arxiv = st.toggle(ui.search_arxiv_checkbox_label, value=False)
 
-                if "subsription" in st.session_state and st.session_state["subsription"] == "Elite":
-                    search_docs = st.toggle(
-                    ui.search_docs_checkbox_label,
-                    value=False,
-                    disabled=False,
-                    key="search_option_disabled",
-                )
-                else:
-                    search_docs = st.toggle(
-                    ui.search_docs_checkbox_label,
-                    value=False,
-                    disabled=True,
-                    key="search_option_disabled",
-                )
+                # if (
+                #     "subsription" in st.session_state
+                #     and st.session_state["subsription"] == "Elite"
+                # ):
+                #     search_docs = st.toggle(
+                #         ui.search_docs_checkbox_label,
+                #         value=False,
+                #         disabled=False,
+                #         key="search_option_disabled",
+                #     )
+                # else:
+                #     search_docs = st.toggle(
+                #         ui.search_docs_checkbox_label,
+                #         value=False,
+                #         disabled=True,
+                #         key="search_option_disabled",
+                #     )
 
                 # search_knowledge_base = True
                 # search_online = st.toggle(ui.search_internet_checkbox_label, value=False)
@@ -134,36 +145,7 @@ if "logged_in" in st.session_state:
 
                 search_docs_option = None
 
-                if search_docs:
-                    # search_docs_option = st.radio(
-                    #     label=ui.search_docs_options,
-                    #     options=(
-                    #         ui.search_docs_options_combined,
-                    #         ui.search_docs_options_isolated,
-                    #     ),
-                    #     horizontal=True,
-                    # )
-
-                    search_docs_option = ui.search_docs_options_isolated
-                    uploaded_files = st.file_uploader(
-                        ui.sidebar_file_uploader_title,
-                        accept_multiple_files=True,
-                        type=None,
-                    )
-
-                    if uploaded_files != []:
-                        st.session_state["chat_disabled"] = False
-                        if uploaded_files != st.session_state.get("uploaded_files"):
-                            st.session_state["uploaded_files"] = uploaded_files
-                            with st.spinner(ui.sidebar_file_uploader_spinner):
-                                st.session_state["faiss_db"] = get_faiss_db(
-                                    uploaded_files
-                                )
-
-                    else:
-                        st.session_state["chat_disabled"] = True
-                else:
-                    st.session_state["chat_disabled"] = False
+                st.session_state["chat_disabled"] = False
 
                 current_top_k_mappings = f"{search_knowledge_base}_{search_online}_{search_wikipedia}_{search_arxiv}_{search_docs_option}"
 
@@ -201,8 +183,6 @@ if "logged_in" in st.session_state:
                         "first_run",
                         "messages",
                         "xata_history",
-                        "uploaded_files",
-                        "faiss_db",
                     ]
                     for key in keys_to_delete:
                         try:
@@ -226,8 +206,6 @@ if "logged_in" in st.session_state:
                         "first_run",
                         "messages",
                         "xata_history",
-                        "uploaded_files",
-                        "faiss_db",
                     ]
                     for key in keys_to_delete:
                         try:
@@ -312,18 +290,42 @@ if "logged_in" in st.session_state:
             )
             if user_query:
                 beginDatetime = get_begin_datetime()
-                if "count_chat_history" not in st.session_state or "begin_hour" not in st.session_state:
+                if (
+                    "count_chat_history" not in st.session_state
+                    or "begin_hour" not in st.session_state
+                ):
                     st.session_state["begin_hour"] = beginDatetime.hour
-                    st.session_state["count_chat_history"] = count_chat_history(st.session_state["username"], beginDatetime)
+                    st.session_state["count_chat_history"] = count_chat_history(
+                        st.session_state["username"], beginDatetime
+                    )
                 else:
-                    if st.session_state["begin_hour"] != beginDatetime.hour or st.session_state["count_chat_history"] % 10 == 0:
+                    if (
+                        st.session_state["begin_hour"] != beginDatetime.hour
+                        or st.session_state["count_chat_history"] % 10 == 0
+                    ):
                         st.session_state["begin_hour"] = beginDatetime.hour
-                        st.session_state["count_chat_history"] = count_chat_history(st.session_state["username"], beginDatetime)
+                        st.session_state["count_chat_history"] = count_chat_history(
+                            st.session_state["username"], beginDatetime
+                        )
 
-                if (not ("subsription" in st.session_state and st.session_state["subsription"] == "Elite")) and st.session_state["count_chat_history"] > 39:
-                    time_range_str = str(beginDatetime.hour) + ":00 - " + str(beginDatetime.hour + 3) + ":00"
+                if (
+                    not (
+                        "subsription" in st.session_state
+                        and st.session_state["subsription"] == "Elite"
+                    )
+                ) and st.session_state["count_chat_history"] > 39:
+                    time_range_str = (
+                        str(beginDatetime.hour)
+                        + ":00 - "
+                        + str(beginDatetime.hour + 3)
+                        + ":00"
+                    )
                     st.chat_message("ai", avatar=ui.chat_ai_avatar).markdown(
-                        "You have reached the usage limit for this time range (UTC " + time_range_str + "). Please try again later. (您已达到 UTC " + time_range_str + " 时间范围的使用限制，请稍后再试。)"
+                        "You have reached the usage limit for this time range (UTC "
+                        + time_range_str
+                        + "). Please try again later. (您已达到 UTC "
+                        + time_range_str
+                        + " 时间范围的使用限制，请稍后再试。)"
                     )
 
                 else:
@@ -366,9 +368,6 @@ if "logged_in" in st.session_state:
                         if (
                             search_knowledge_base
                             or search_online
-                            or search_wikipedia
-                            or search_arxiv
-                            or search_docs
                         ):
                             formatted_messages = str(
                                 [
@@ -382,7 +381,6 @@ if "logged_in" in st.session_state:
                             )
 
                             query = func_calling_response.get("query")
-                            arxiv_query = func_calling_response.get("arxiv_query")
 
                             try:
                                 created_at = json.loads(
@@ -407,37 +405,22 @@ if "logged_in" in st.session_state:
                                     top_k=search_knowledge_base_top_k,
                                 )
                             )
-                            # docs_response.extend(
-                            #     search_weaviate(
-                            #         query=query,
-                            #         top_k=search_knowledge_base_top_k,
-                            #     )
-                            # )
                             docs_response.extend(
                                 search_internet(query, top_k=search_online_top_k)
                             )
-                            docs_response.extend(
-                                search_wiki(query, top_k=search_wikipedia_top_k)
-                            )
-                            docs_response.extend(
-                                search_arxiv_docs(arxiv_query, top_k=search_arxiv_top_k)
-                            )
-                            docs_response.extend(
-                                search_uploaded_docs(query, top_k=search_docs_top_k)
-                            )
 
                             input = f"""Must Follow:
-        - Respond to "{user_query}" by using information from "{docs_response}" (if available) and your own knowledge to provide a logical, clear, and critically analyzed reply in the same language.
-    - Use the chat context from "{chat_history_recent}" (if available) to adjust the level of detail in your response.
-    - Employ bullet points selectively, where they add clarity or organization.
-    - Cite sources in main text using the Author-Date citation style where applicable.
-    - Provide a list of references in markdown format of [title.journal.authors.date.](hyperlinks) at the end (or just the source file name), only for the references mentioned in the generated text.
-    - Use LaTeX quoted by '$' or '$$' within markdown to render mathematical formulas.
+- Respond to "{user_query}" by using information from "{docs_response}" (if available) and your own knowledge to provide a logical, clear, and critically analyzed reply in the same language.
+- Use the chat context from "{chat_history_recent}" (if available) to adjust the level of detail in your response.
+- Employ bullet points selectively, where they add clarity or organization.
+- Cite sources in main text using the Author-Date citation style where applicable.
+- Provide a list of references in markdown format of [title.journal.authors.date.](hyperlinks) at the end (or just the source file name), only for the references mentioned in the generated text.
+- Use LaTeX quoted by '$' or '$$' within markdown to render mathematical formulas.
 
-    Must Avoid:
-    - Repeat the human's query.
-    - Translate cited references into the query's language.
-    - Preface responses with any designation such as "AI:"."""
+Must Avoid:
+- Repeat the human's query.
+- Translate cited references into the query's language.
+- Preface responses with any designation such as "AI:"."""
 
                         else:
                             input = f"""Respond to "{user_query}". If "{chat_history_recent}" is not empty, use it as chat context."""
@@ -452,11 +435,11 @@ if "logged_in" in st.session_state:
                             st.session_state["messages"].append(
                                 {
                                     "role": "ai",
-                                    "content": response["text"],
+                                    "content": response,
                                 }
                             )
                             ai_message = AIMessage(
-                                content=response["text"],
+                                content=response,
                                 additional_kwargs={"id": st.session_state["username"]},
                             )
                             st.session_state["xata_history"].add_message(ai_message)

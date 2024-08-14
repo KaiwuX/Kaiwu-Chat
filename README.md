@@ -51,55 +51,20 @@ git tag v0.0.1
 git push origin v0.0.1
 ```
 
-### Docker Manually Build
-
-```bash
-docker build -t linancn/tiangong-ai-chat:v0.0.1 .
-docker push linancn/tiangong-ai-chat:v0.0.1
-```
-
 ### Production Run
 
 ```bash
+docker build -t 339712838008.dkr.ecr.us-east-1.amazonaws.com/kaiwu-chat:0.0.1 -f Dockerfile.wix .
 
-docker network create tiangongbridge
+aws ecr get-login-password --region us-east-1  | docker login --username AWS --password-stdin 339712838008.dkr.ecr.us-east-1.amazonaws.com
 
-docker run --detach \
-    --name nginx-proxy \
-    --restart=always \
-    --publish 80:80 \
-    --publish 443:443 \
-    --volume certs:/etc/nginx/certs \
-    --volume vhost:/etc/nginx/vhost.d \
-    --volume html:/usr/share/nginx/html \
-    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-    --network=tiangongbridge \
-    --network-alias=nginx-proxy \
-    nginxproxy/nginx-proxy:latest
+docker push 339712838008.dkr.ecr.us-east-1.amazonaws.com/kaiwu-chat:0.0.1
 
-docker run --detach \
-    --name nginx-proxy-acme \
-    --restart=always \
-    --volumes-from nginx-proxy \
-    --volume /var/run/docker.sock:/var/run/docker.sock:ro \
-    --volume acme:/etc/acme.sh \
-    --network=tiangongbridge \
-    --network-alias=nginx-proxy-acme \
-    nginxproxy/acme-companion:latest
+aws ecs describe-task-definition --task-definition langserve:8
 
-docker run --detach \
-    --name tiangong-ai-chat \
-    --restart=always \
-    --expose 8501 \
-    --net=tiangongbridge \
-    --env ui=tiangong-en \
-    --env VIRTUAL_HOST=YourURL \
-    --env VIRTUAL_PORT=8501 \
-    --env LETSENCRYPT_HOST=YourURL \
-    --env LETSENCRYPT_EMAIL=YourEmail \
-    linancn/tiangong-ai-chat:latest
+aws ecs describe-tasks --cluster production --tasks cb72b1cf0ee240b3b3820f3e9431cb7c
 
-docker cp .streamlit/secrets.toml tiangong-ai-chat:/app/.streamlit/secrets.toml
+
 
 ```
 

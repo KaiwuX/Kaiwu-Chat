@@ -28,55 +28,6 @@ pip freeze > requirements_freeze.txt
 
 ```bash
 sudo apt install python3.11-dev
-sudo apt-get -y install libmagic-dev
-sudo apt-get -y  install poppler-utils
-sudo apt-get -y  install tesseract-ocr
-sudo apt-get -y  install libreoffice
-sudo apt-get -y  install pandoc
-```
-
-Install Cuda (optional):
-
-```bash
-sudo apt install nvidia-cuda-toolkit
-```
-
-## Env Preparing in MacOS
-
-Install `Python 3.11`
-
-```bash
-brew update
-brew install python@3.11
-```
-
-Setup `venv`:
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-```
-
-Install requirements:
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install -r requirements.txt --upgrade
-```
-
-```bash
-brew update
-brew install libmagic
-brew install poppler-qt5
-# echo 'export PATH="/usr/local/opt/poppler-qt5/bin:$PATH"' >> ~/.zshrc
-# export LDFLAGS="-L/usr/local/opt/poppler-qt5/lib"
-# export CPPFLAGS="-I/usr/local/opt/poppler-qt5/include"
-brew install tesseract
-# brew install tesseract-lang
-# brew cleanup tesseract-lang
-brew install libreoffice
-brew install pandoc
 ```
 
 ## Start
@@ -98,13 +49,6 @@ git tag
 git tag v0.0.1
 #push this tag to origin
 git push origin v0.0.1
-```
-
-### sphinx
-
-```bash
-sphinx-apidoc --force -o sphinx/source/ src/
-sphinx-autobuild sphinx/source docs/
 ```
 
 ### Docker Manually Build

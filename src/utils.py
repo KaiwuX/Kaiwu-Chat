@@ -258,10 +258,8 @@ def func_calling_chain():
 
     llm_func_calling = ChatOpenAI(model_name=llm_model, temperature=0, streaming=False)
 
-    func_calling_chain = create_structured_output_runnable(
-        output_schema=func_calling_json_schema,
-        llm=llm_func_calling,
-        prompt=prompt_func_calling,
+    func_calling_chain = prompt_func_calling | llm_func_calling.with_structured_output(
+        func_calling_json_schema
     )
 
     return func_calling_chain

@@ -82,7 +82,7 @@ brew install pandoc
 ## Start
 
 ```bash
-export ui=tiangong-en
+export ui=kaiwu-en
 
 streamlit run Chat.py
 ```

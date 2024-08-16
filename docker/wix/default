@@ -22,4 +22,8 @@ server {
         alias /var/www/callback/;
     }
 
+    location /health/ {
+        return 200 'healthy\n';
+    }
+
 }

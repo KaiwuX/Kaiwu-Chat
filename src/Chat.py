@@ -1,5 +1,5 @@
+import asyncio
 import datetime
-import json
 import time
 import uuid
 from datetime import datetime
@@ -12,20 +12,17 @@ import ui_config
 import utils
 import wix_oauth as wix_oauth
 from sensitivity_checker import check_text_sensitivity
-from top_k_mappings import top_k_mappings
 from utils import (
     StreamHandler,
     check_password,
     count_chat_history,
     delete_chat_history,
     fetch_chat_history,
-    func_calling_chain,
     get_begin_datetime,
     initialize_messages,
     main_chain,
     random_email,
-    search_internet,
-    search_pinecone,
+    concurrent_search_service,
     xata_chat_history,
 )
 
@@ -102,22 +99,46 @@ if "logged_in" in st.session_state:
                 if "search_option_disabled" not in st.session_state:
                     st.session_state["search_option_disabled"] = False
 
-                search_knowledge_base = st.toggle(
-                    ui.search_knowledge_base_checkbox_label,
+                search_sci = st.toggle(
+                    ui.search_journal_paper_checkbox_label,
                     value=False,
                     disabled=st.session_state["search_option_disabled"],
                 )
+                search_report = st.toggle(
+                    ui.search_report_checkbox_label, 
+                    value=False,
+                    disabled=st.session_state["search_option_disabled"],
+                )
+                search_standard = st.toggle(
+                    ui.search_standard_checkbox_label, 
+                    value=False,
+                    disabled=st.session_state["search_option_disabled"],
+                )
+
+                search_patent = st.toggle(
+                    ui.search_patent_checkbox_label, 
+                    value=False,
+                    disabled=st.session_state["search_option_disabled"],
+                )
+
                 search_online = st.toggle(
                     ui.search_internet_checkbox_label,
                     value=False,
                     disabled=st.session_state["search_option_disabled"],
                 )
 
-                # search_wikipedia = st.toggle(
-                #     ui.search_wikipedia_checkbox_label, value=False
-                # )
+                search_list = []
+                if search_sci:
+                    search_list.append("sci_search")
+                if search_report:
+                    search_list.append("report_search")
+                if search_standard:
+                    search_list.append("standard_search")
+                if search_patent:
+                    search_list.append("patent_search")
+                if search_online:
+                    search_list.append("internet_search")
 
-                # search_arxiv = st.toggle(ui.search_arxiv_checkbox_label, value=False)
 
                 # if (
                 #     "subsription" in st.session_state
@@ -139,35 +160,35 @@ if "logged_in" in st.session_state:
 
                 # search_knowledge_base = True
                 # search_online = st.toggle(ui.search_internet_checkbox_label, value=False)
-                search_wikipedia = False
-                search_arxiv = False
-                # search_docs = False
+                # search_wikipedia = False
+                # search_arxiv = False
+                # # search_docs = False
 
-                search_docs_option = None
+                # search_docs_option = None
 
-                st.session_state["chat_disabled"] = False
+                # st.session_state["chat_disabled"] = False
 
-                current_top_k_mappings = f"{search_knowledge_base}_{search_online}_{search_wikipedia}_{search_arxiv}_{search_docs_option}"
+                # current_top_k_mappings = f"{search_knowledge_base}_{search_online}_{search_wikipedia}_{search_arxiv}_{search_docs_option}"
 
-                top_k_values = top_k_mappings.get(current_top_k_mappings)
+                # top_k_values = top_k_mappings.get(current_top_k_mappings)
 
-                # override search_docs_top_k if search_docs_option is isolated
-                if top_k_values is None:
-                    search_knowledge_base_top_k = 0
-                    search_online_top_k = 0
-                    search_wikipedia_top_k = 0
-                    search_arxiv_top_k = 0
-                    search_docs_top_k = 16
-                else:
-                    search_knowledge_base_top_k = top_k_values.get(
-                        "search_knowledge_base_top_k", 0
-                    )
-                    search_online_top_k = top_k_values.get("search_online_top_k", 0)
-                    search_wikipedia_top_k = top_k_values.get(
-                        "search_wikipedia_top_k", 0
-                    )
-                    search_arxiv_top_k = top_k_values.get("search_arxiv_top_k", 0)
-                    search_docs_top_k = top_k_values.get("search_docs_top_k", 0)
+                # # override search_docs_top_k if search_docs_option is isolated
+                # if top_k_values is None:
+                #     search_knowledge_base_top_k = 0
+                #     search_online_top_k = 0
+                #     search_wikipedia_top_k = 0
+                #     search_arxiv_top_k = 0
+                #     search_docs_top_k = 16
+                # else:
+                #     search_knowledge_base_top_k = top_k_values.get(
+                #         "search_knowledge_base_top_k", 0
+                #     )
+                #     search_online_top_k = top_k_values.get("search_online_top_k", 0)
+                #     search_wikipedia_top_k = top_k_values.get(
+                #         "search_wikipedia_top_k", 0
+                #     )
+                #     search_arxiv_top_k = top_k_values.get("search_arxiv_top_k", 0)
+                #     search_docs_top_k = top_k_values.get("search_docs_top_k", 0)
 
             st.markdown(body=ui.sidebar_instructions, unsafe_allow_html=True)
 
@@ -366,48 +387,52 @@ if "logged_in" in st.session_state:
                         chat_history_recent = str(current_message)
 
                         if (
-                            search_knowledge_base
-                            or search_online
+                            search_sci
+                            or search_online 
+                            or search_report 
+                            or search_patent 
+                            or search_standard
                         ):
-                            formatted_messages = str(
-                                [
-                                    (msg["role"], msg["content"])
-                                    for msg in st.session_state["messages"][1:]
-                                ]
-                            )
+                            # formatted_messages = str(
+                            #     [
+                            #         (msg["role"], msg["content"])
+                            #         for msg in st.session_state["messages"][1:]
+                            #     ]
+                            # )
 
-                            func_calling_response = func_calling_chain().invoke(
-                                {"input": formatted_messages}
-                            )
+                            # func_calling_response = func_calling_chain().invoke(
+                            #     {"input": formatted_messages}
+                            # )
 
-                            query = func_calling_response.get("query")
+                            # query = func_calling_response.get("query")
 
-                            try:
-                                created_at = json.loads(
-                                    func_calling_response.get("created_at", None)
-                                )
-                            except TypeError:
-                                created_at = None
+                            # try:
+                            #     created_at = json.loads(
+                            #         func_calling_response.get("created_at", None)
+                            #     )
+                            # except TypeError:
+                            #     created_at = None
 
-                            source = func_calling_response.get("source", None)
+                            # source = func_calling_response.get("source", None)
 
-                            filters = {}
-                            if created_at:
-                                filters["created_at"] = created_at
-                            if source:
-                                filters["source"] = source
+                            # filters = {}
+                            # if created_at:
+                            #     filters["created_at"] = created_at
+                            # if source:
+                            #     filters["source"] = source
 
-                            docs_response = []
-                            docs_response.extend(
-                                search_pinecone(
-                                    query=query,
-                                    filters=filters,
-                                    top_k=search_knowledge_base_top_k,
-                                )
-                            )
-                            docs_response.extend(
-                                search_internet(query, top_k=search_online_top_k)
-                            )
+                            # docs_response = []
+                            # docs_response.extend(
+                            #     search_sci_service(
+                            #         query=query,
+                            #         filters=filters,
+                            #         top_k=3,
+                            #     )
+                            # )
+                            # docs_response.extend(
+                            #     search_internet(query, top_k=3)
+                            # )
+                            docs_response = asyncio.run(concurrent_search_service(urls=search_list,query=user_query))
 
                             input = f"""Must Follow:
 - Respond to "{user_query}" by using information from "{docs_response}" (if available) and your own knowledge to provide a logical, clear, and critically analyzed reply in the same language.

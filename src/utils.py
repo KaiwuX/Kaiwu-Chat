@@ -9,6 +9,9 @@ from datetime import datetime
 
 import pytz
 import streamlit as st
+import aiohttp
+import asyncio
+
 
 os.environ["OPENAI_API_KEY"] = st.secrets["openai_api_key"]
 os.environ["XATA_API_KEY"] = st.secrets["xata_api_key"]
@@ -18,25 +21,30 @@ os.environ["XATA_DOCS_URL"] = st.secrets["xata_docs_url"]
 os.environ["LLM_MODEL"] = st.secrets["llm_model"]
 os.environ["LANGCHAIN_VERBOSE"] = str(st.secrets["langchain_verbose"])
 os.environ["PASSWORD"] = st.secrets["password"]
-os.environ["PINECONE_API_KEY"] = st.secrets["pinecone_api_key"]
-os.environ["PINECONE_INDEX_NAME"] = st.secrets["pinecone_index_name"]
-os.environ["PINECONE_EMBEDDING_MODEL"] = st.secrets["pinecone_embedding_model"]
+os.environ["X_REGION"] = st.secrets["x_region"]
+os.environ["EMAIL"] = st.secrets["email"]
+os.environ["PW"] = st.secrets["pw"]
+os.environ['REMOTE_BEARER_TOKEN'] = st.secrets['bearer_token']
+os.environ["END_POINT"] = st.secrets["end_point"]
 
 
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
+    # ChatPromptTemplate,
+    # HumanMessagePromptTemplate,
     PromptTemplate,
 )
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain.schema import AIMessage, HumanMessage
 from langchain_community.chat_message_histories import XataChatMessageHistory
-from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.output_parsers import StrOutputParser
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
+from langchain_openai import ChatOpenAI
 from xata.client import XataClient
+# os.environ["PINECONE_API_KEY"] = st.secrets["pinecone_api_key"]
+# os.environ["PINECONE_INDEX_NAME"] = st.secrets["pinecone_index_name"]
+# os.environ["PINECONE_EMBEDDING_MODEL"] = st.secrets["pinecone_embedding_model"]
+# from langchain_pinecone import PineconeVectorStore
+# from langchain_community.tools import DuckDuckGoSearchResults
+# from langchain.chains.openai_functions import create_structured_output_runnable
 
 import ui_config
 
@@ -119,293 +127,49 @@ def check_password():
         return True
 
 
-def func_calling_chain():
+async def fetch(session, url, query, results_per_url, headers):
+    async with session.post(
+        os.environ["END_POINT"] + url,
+        headers=headers,
+        json={"query": query, "topK": results_per_url}
+    ) as response:
+        if response.status == 200:
+            try:
+                return await response.json()
+            except aiohttp.ContentTypeError:
+                return {"error": "Invalid JSON response"}
+        else:
+            return {"error": f"Request failed with status code {response.status}"}
+
+async def concurrent_search_service(urls: list, query: str, top_k: int = 16):
     """
-    Creates and returns a function calling chain for extracting query and filter information from a chat history.
+    Perform concurrent search requests to multiple URLs with specified query and filters.
 
-    :returns: An object representing the function calling chain configured to generate structured output based on the provided JSON schema and chat prompt template.
-    :rtype: object
+    Args:
+        urls (list): List of endpoint URLs to send the requests to.
+        query (str): The search query string.
+        top_k (int): The maximum number of results to retrieve per URL.
 
-    Function Behavior:
-        - Defines a JSON schema for structured output that includes query information and date filters.
-        - Creates a chat prompt template to instruct the underlying language model on how to generate the desired structured output.
-        - Utilizes a language model for structured output generation.
-        - Creates the function calling chain with 'create_structured_output_runnable', passing the JSON schema, language model, and chat prompt template as arguments.
-
-    Exceptions:
-        - This function depends on external modules and classes like 'SystemMessage', 'HumanMessage', 'ChatPromptTemplate', etc. Exceptions may arise if these dependencies encounter issues.
-
-    Note:
-        - It uses a specific language model identified by 'llm_model' for structured output generation. Ensure that 'llm_model' is properly initialized and available for use to avoid unexpected issues.
+    Returns:
+        list: A list of responses from all the URLs.
     """
-    func_calling_json_schema = {
-        "title": "get_querys_and_filters_to_search_database",
-        "description": "Extract the queries and filters for database searching",
-        "type": "object",
-        "properties": {
-            "query": {
-                "title": "Query",
-                "description": "The next query extracted for a vector database semantic search from a chat history. Translate the query into accurate English if it is not already in English.",
-                "type": "string",
-            },
-            "source": {
-                "title": "Source Filter",
-                "description": "Journal Name or Source extracted for a vector database semantic search, MUST be in upper case.",
-                "type": "string",
-                "enum": [
-                    "AGRICULTURE, ECOSYSTEMS & ENVIRONMENT",
-                    "ANNUAL REVIEW OF ECOLOGY, EVOLUTION, AND SYSTEMATICS",
-                    "ANNUAL REVIEW OF ENVIRONMENT AND RESOURCES",
-                    "APPLIED CATALYSIS B: ENVIRONMENTAL",
-                    "BIOGEOSCIENCES",
-                    "BIOLOGICAL CONSERVATION",
-                    "BIOTECHNOLOGY ADVANCES",
-                    "CONSERVATION BIOLOGY",
-                    "CONSERVATION LETTERS",
-                    "CRITICAL REVIEWS IN ENVIRONMENTAL SCIENCE AND TECHNOLOGY",
-                    "DIVERSITY AND DISTRIBUTIONS",
-                    "ECOGRAPHY",
-                    "ECOLOGICAL APPLICATIONS",
-                    "ECOLOGICAL ECONOMICS",
-                    "ECOLOGICAL MONOGRAPHS",
-                    "ECOLOGY",
-                    "ECOLOGY LETTERS",
-                    "ECONOMIC SYSTEMS RESEARCH",
-                    "ECOSYSTEM HEALTH AND SUSTAINABILITY",
-                    "ECOSYSTEM SERVICES",
-                    "ECOSYSTEMS",
-                    "ENERGY & ENVIRONMENTAL SCIENCE",
-                    "ENVIRONMENT INTERNATIONAL",
-                    "ENVIRONMENTAL CHEMISTRY LETTERS",
-                    "ENVIRONMENTAL HEALTH PERSPECTIVES",
-                    "ENVIRONMENTAL POLLUTION",
-                    "ENVIRONMENTAL SCIENCE & TECHNOLOGY",
-                    "ENVIRONMENTAL SCIENCE & TECHNOLOGY LETTERS",
-                    "ENVIRONMENTAL SCIENCE AND ECOTECHNOLOGY",
-                    "ENVIRONMENTAL SCIENCE AND POLLUTION RESEARCH",
-                    "EVOLUTION",
-                    "FOREST ECOSYSTEMS",
-                    "FRONTIERS IN ECOLOGY AND THE ENVIRONMENT",
-                    "FRONTIERS OF ENVIRONMENTAL SCIENCE & ENGINEERING",
-                    "FUNCTIONAL ECOLOGY",
-                    "GLOBAL CHANGE BIOLOGY",
-                    "GLOBAL ECOLOGY AND BIOGEOGRAPHY",
-                    "GLOBAL ENVIRONMENTAL CHANGE",
-                    "INTERNATIONAL SOIL AND WATER CONSERVATION RESEARCH",
-                    "JOURNAL OF ANIMAL ECOLOGY",
-                    "JOURNAL OF APPLIED ECOLOGY",
-                    "JOURNAL OF BIOGEOGRAPHY",
-                    "JOURNAL OF CLEANER PRODUCTION",
-                    "JOURNAL OF ECOLOGY",
-                    "JOURNAL OF ENVIRONMENTAL INFORMATICS",
-                    "JOURNAL OF ENVIRONMENTAL MANAGEMENT",
-                    "JOURNAL OF HAZARDOUS MATERIALS",
-                    "JOURNAL OF INDUSTRIAL ECOLOGY",
-                    "JOURNAL OF PLANT ECOLOGY",
-                    "LANDSCAPE AND URBAN PLANNING",
-                    "LANDSCAPE ECOLOGY",
-                    "METHODS IN ECOLOGY AND EVOLUTION",
-                    "MICROBIOME",
-                    "MOLECULAR ECOLOGY",
-                    "NATURE",
-                    "NATURE CLIMATE CHANGE",
-                    "NATURE COMMUNICATIONS",
-                    "NATURE ECOLOGY & EVOLUTION",
-                    "NATURE ENERGY",
-                    "NATURE REVIEWS EARTH & ENVIRONMENT",
-                    "NATURE SUSTAINABILITY",
-                    "ONE EARTH",
-                    "PEOPLE AND NATURE",
-                    "PROCEEDINGS OF THE NATIONAL ACADEMY OF SCIENCES",
-                    "PROCEEDINGS OF THE ROYAL SOCIETY B: BIOLOGICAL SCIENCES",
-                    "RENEWABLE AND SUSTAINABLE ENERGY REVIEWS",
-                    "RESOURCES, CONSERVATION AND RECYCLING",
-                    "REVIEWS IN ENVIRONMENTAL SCIENCE AND BIO/TECHNOLOGY",
-                    "SCIENCE",
-                    "SCIENCE ADVANCES",
-                    "SCIENCE OF THE TOTAL ENVIRONMENT",
-                    "SCIENTIFIC DATA",
-                    "SUSTAINABLE CITIES AND SOCIETY",
-                    "SUSTAINABLE MATERIALS AND TECHNOLOGIES",
-                    "SUSTAINABLE PRODUCTION AND CONSUMPTION",
-                    "THE AMERICAN NATURALIST",
-                    "THE INTERNATIONAL JOURNAL OF LIFE CYCLE ASSESSMENT",
-                    "THE ISME JOURNAL",
-                    "THE LANCET PLANETARY HEALTH",
-                    "TRENDS IN ECOLOGY & EVOLUTION",
-                    "WASTE MANAGEMENT",
-                    "WATER RESEARCH",
-                ],
-            },
-            "created_at": {
-                "title": "Date Filter",
-                "description": 'Date extracted for a vector database semantic search, in MongoDB\'s query and projection operators, in format like {"$gte": 1609459200.0, "$lte": 1640908800.0}',
-                "type": "string",
-            },
-        },
-        "required": ["query"],
+    num_urls = len(urls)
+    results_per_url = max(1, min(10, top_k // num_urls))
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.environ['REMOTE_BEARER_TOKEN']}",
+        "email": os.environ["EMAIL"],
+        "password": os.environ["PW"],
+        "x-region": os.environ["X_REGION"]
     }
 
-    prompt_func_calling_msgs = [
-        SystemMessage(
-            content="You are a world-class algorithm for extracting the next query and filters for searching from a chat history. Make sure to answer in the correct structured format."
-        ),
-        HumanMessage(content="The chat history:"),
-        HumanMessagePromptTemplate.from_template("{input}"),
-    ]
-
-    prompt_func_calling = ChatPromptTemplate(messages=prompt_func_calling_msgs)
-
-    llm_func_calling = ChatOpenAI(model_name=llm_model, temperature=0, streaming=False)
-
-    func_calling_chain = prompt_func_calling | llm_func_calling.with_structured_output(
-        func_calling_json_schema
-    )
-
-    return func_calling_chain
-
-
-def search_pinecone(query: str, filters: dict = {}, top_k: int = 16):
-    """
-    Performs a similarity search on Pinecone's vector database based on a given query and optional date filter, and returns a list of relevant documents.
-
-    :param query: The query to be used for similarity search in Pinecone's vector database.
-    :type query: str
-    :param created_at: The date filter to be applied in the search, specified in a format compatible with Pinecone's filtering options.
-    :type created_at: str or None
-    :param top_k: The number of top matching documents to return. Defaults to 16.
-    :type top_k: int or None
-    :returns: A list of dictionaries, each containing the content and source of the matched documents. The function returns an empty list if 'top_k' is set to 0.
-    :rtype: list of dicts
-
-    Function Behavior:
-        - Initializes Pinecone with the specified API key and environment.
-        - Conducts a similarity search based on the provided query and optional date filter.
-        - Extracts and formats the relevant document information before returning.
-
-    Exceptions:
-        - This function relies on Pinecone and Python's os library. Exceptions could propagate if there are issues related to API keys, environment variables, or Pinecone initialization.
-        - TypeError could be raised if the types of 'query', 'created_at', or 'top_k' do not match the expected types.
-
-    Note:
-        - Ensure the Pinecone API key and environment variables are set before running this function.
-        - The function uses 'OpenAIEmbeddings' to initialize Pinecone's vector store, which should be compatible with the embeddings in the Pinecone index.
-    """
-
-    if top_k == 0:
-        return []
-
-    embeddings = OpenAIEmbeddings(model=os.environ["PINECONE_EMBEDDING_MODEL"])
-
-    vectorstore = PineconeVectorStore(embedding=embeddings, namespace="sci")
-
-    if filters:
-        docs = vectorstore.similarity_search(query, k=top_k, filter=filters)
-    else:
-        docs = vectorstore.similarity_search(query, k=top_k)
-
-    doi_set = set()
-    for doc in docs:
-        doi_set.add(doc.metadata["doi"])
-
-    xata_docs = XataClient(
-        api_key=os.environ["XATA_DOCS_API_KEY"], db_url=os.environ["XATA_DOCS_URL"]
-    )
-
-    xata_response = xata_docs.data().query(
-        "journals",
-        {
-            "columns": ["doi", "title", "authors"],
-            "filter": {
-                "doi": {"$any": list(doi_set)},
-            },
-        },
-    )
-    records = xata_response.get("records", [])
-    records_dict = {record["doi"]: record for record in records}
-
-    docs_list = []
-    for doc in docs:
-        try:
-            record = records_dict.get(doc.metadata["doi"], {})
-            authors = ", ".join(record["authors"]) if record.get("authors") else ""
-            date = datetime.fromtimestamp(doc.metadata["date"])
-            formatted_date = date.strftime("%Y-%m")  # Format date as 'YYYY-MM'
-            url = "https://doi.org/{}".format(doc.metadata["doi"])
-            source_entry = "[{}. {}. {}. {}.]({})".format(
-                record["title"],
-                doc.metadata["journal"],
-                authors,
-                formatted_date,
-                url,
-            )
-            docs_list.append({"content": doc.page_content, "source": source_entry})
-
-            # date = datetime.fromtimestamp(doc.metadata["created_at"])
-            # formatted_date = date.strftime("%Y-%m")  # Format date as 'YYYY-MM'
-            # source_entry = "[{}. {}. {}. {}.]({})".format(
-            #     doc.metadata["source_id"],
-            #     doc.metadata["source"],
-            #     doc.metadata["author"],
-            #     formatted_date,
-            #     doc.metadata["url"],
-            # )
-            # docs_list.append({"content": doc.page_content, "source": source_entry})
-        except:
-            docs_list.append(
-                {"content": doc.page_content, "source": doc.metadata["source"]}
-            )
-
-    return docs_list
-
-
-def search_internet(query, top_k=4):
-    """
-    Performs an internet search based on the provided query using the DuckDuckGo search engine and returns a list of top results.
-
-    :param query: The query string for the internet search.
-    :type query: str
-    :param top_k: The maximum number of top results to return. Defaults to 4.
-    :type top_k: int or None.
-    :returns: A list of dictionaries, each containing the snippet, title, and link of a search result. The function returns an empty list if 'top_k' is set to 0.
-    :rtype: list of dicts
-
-    Function Behavior:
-        - Uses the DuckDuckGoSearchResults class to perform the search.
-        - Parses the raw search results to extract relevant snippet, title, and link information.
-        - Structures this information into a list of dictionaries and returns it.
-
-    Exceptions:
-        - This function relies on the DuckDuckGoSearchResults class, so exceptions might propagate from issues in that dependency.
-        - TypeError could be raised if the types of 'query' or 'top_k' do not match the expected types.
-    """
-
-    if top_k == 0:
-        return []
-
-    search = DuckDuckGoSearchResults(num_results=top_k)
-
-    results = search.run(query)
-
-    pattern = r"\[snippet: (.*?), title: (.*?), link: (.*?)\]"
-    matches = re.findall(pattern, results)
-
-    docs = [
-        {"snippet": match[0], "title": match[1], "link": match[2]} for match in matches
-    ]
-
-    docs_list = []
-
-    for doc in docs:
-        docs_list.append(
-            {
-                "content": doc["snippet"],
-                "source": "[{}]({})".format(doc["title"], doc["link"]),
-            }
-        )
-
-    return docs_list
-
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+            fetch(session, url, query, results_per_url, headers)
+            for url in urls
+        ]
+        return await asyncio.gather(*tasks)
 
 def main_chain():
     """
@@ -724,3 +488,314 @@ def count_chat_history(username: str, beginDatetime: datetime):
         return records[0]["c"]
     else:
         return 0
+
+# def func_calling_chain():
+#     """
+#     Creates and returns a function calling chain for extracting query and filter information from a chat history.
+
+#     :returns: An object representing the function calling chain configured to generate structured output based on the provided JSON schema and chat prompt template.
+#     :rtype: object
+
+#     Function Behavior:
+#         - Defines a JSON schema for structured output that includes query information and date filters.
+#         - Creates a chat prompt template to instruct the underlying language model on how to generate the desired structured output.
+#         - Utilizes a language model for structured output generation.
+#         - Creates the function calling chain with 'create_structured_output_runnable', passing the JSON schema, language model, and chat prompt template as arguments.
+
+#     Exceptions:
+#         - This function depends on external modules and classes like 'SystemMessage', 'HumanMessage', 'ChatPromptTemplate', etc. Exceptions may arise if these dependencies encounter issues.
+
+#     Note:
+#         - It uses a specific language model identified by 'llm_model' for structured output generation. Ensure that 'llm_model' is properly initialized and available for use to avoid unexpected issues.
+#     """
+#     func_calling_json_schema = {
+#         "title": "get_querys_and_filters_to_search_database",
+#         "description": "Extract the queries and filters for database searching",
+#         "type": "object",
+#         "properties": {
+#             "query": {
+#                 "title": "Query",
+#                 "description": "The next query extracted for a vector database semantic search from a chat history. Translate the query into accurate English if it is not already in English.",
+#                 "type": "string",
+#             },
+#             "source": {
+#                 "title": "Source Filter",
+#                 "description": "Journal Name or Source extracted for a vector database semantic search, MUST be in upper case.",
+#                 "type": "string",
+#                 "enum": [
+#                     "AGRICULTURE, ECOSYSTEMS & ENVIRONMENT",
+#                     "ANNUAL REVIEW OF ECOLOGY, EVOLUTION, AND SYSTEMATICS",
+#                     "ANNUAL REVIEW OF ENVIRONMENT AND RESOURCES",
+#                     "APPLIED CATALYSIS B: ENVIRONMENTAL",
+#                     "BIOGEOSCIENCES",
+#                     "BIOLOGICAL CONSERVATION",
+#                     "BIOTECHNOLOGY ADVANCES",
+#                     "CONSERVATION BIOLOGY",
+#                     "CONSERVATION LETTERS",
+#                     "CRITICAL REVIEWS IN ENVIRONMENTAL SCIENCE AND TECHNOLOGY",
+#                     "DIVERSITY AND DISTRIBUTIONS",
+#                     "ECOGRAPHY",
+#                     "ECOLOGICAL APPLICATIONS",
+#                     "ECOLOGICAL ECONOMICS",
+#                     "ECOLOGICAL MONOGRAPHS",
+#                     "ECOLOGY",
+#                     "ECOLOGY LETTERS",
+#                     "ECONOMIC SYSTEMS RESEARCH",
+#                     "ECOSYSTEM HEALTH AND SUSTAINABILITY",
+#                     "ECOSYSTEM SERVICES",
+#                     "ECOSYSTEMS",
+#                     "ENERGY & ENVIRONMENTAL SCIENCE",
+#                     "ENVIRONMENT INTERNATIONAL",
+#                     "ENVIRONMENTAL CHEMISTRY LETTERS",
+#                     "ENVIRONMENTAL HEALTH PERSPECTIVES",
+#                     "ENVIRONMENTAL POLLUTION",
+#                     "ENVIRONMENTAL SCIENCE & TECHNOLOGY",
+#                     "ENVIRONMENTAL SCIENCE & TECHNOLOGY LETTERS",
+#                     "ENVIRONMENTAL SCIENCE AND ECOTECHNOLOGY",
+#                     "ENVIRONMENTAL SCIENCE AND POLLUTION RESEARCH",
+#                     "EVOLUTION",
+#                     "FOREST ECOSYSTEMS",
+#                     "FRONTIERS IN ECOLOGY AND THE ENVIRONMENT",
+#                     "FRONTIERS OF ENVIRONMENTAL SCIENCE & ENGINEERING",
+#                     "FUNCTIONAL ECOLOGY",
+#                     "GLOBAL CHANGE BIOLOGY",
+#                     "GLOBAL ECOLOGY AND BIOGEOGRAPHY",
+#                     "GLOBAL ENVIRONMENTAL CHANGE",
+#                     "INTERNATIONAL SOIL AND WATER CONSERVATION RESEARCH",
+#                     "JOURNAL OF ANIMAL ECOLOGY",
+#                     "JOURNAL OF APPLIED ECOLOGY",
+#                     "JOURNAL OF BIOGEOGRAPHY",
+#                     "JOURNAL OF CLEANER PRODUCTION",
+#                     "JOURNAL OF ECOLOGY",
+#                     "JOURNAL OF ENVIRONMENTAL INFORMATICS",
+#                     "JOURNAL OF ENVIRONMENTAL MANAGEMENT",
+#                     "JOURNAL OF HAZARDOUS MATERIALS",
+#                     "JOURNAL OF INDUSTRIAL ECOLOGY",
+#                     "JOURNAL OF PLANT ECOLOGY",
+#                     "LANDSCAPE AND URBAN PLANNING",
+#                     "LANDSCAPE ECOLOGY",
+#                     "METHODS IN ECOLOGY AND EVOLUTION",
+#                     "MICROBIOME",
+#                     "MOLECULAR ECOLOGY",
+#                     "NATURE",
+#                     "NATURE CLIMATE CHANGE",
+#                     "NATURE COMMUNICATIONS",
+#                     "NATURE ECOLOGY & EVOLUTION",
+#                     "NATURE ENERGY",
+#                     "NATURE REVIEWS EARTH & ENVIRONMENT",
+#                     "NATURE SUSTAINABILITY",
+#                     "ONE EARTH",
+#                     "PEOPLE AND NATURE",
+#                     "PROCEEDINGS OF THE NATIONAL ACADEMY OF SCIENCES",
+#                     "PROCEEDINGS OF THE ROYAL SOCIETY B: BIOLOGICAL SCIENCES",
+#                     "RENEWABLE AND SUSTAINABLE ENERGY REVIEWS",
+#                     "RESOURCES, CONSERVATION AND RECYCLING",
+#                     "REVIEWS IN ENVIRONMENTAL SCIENCE AND BIO/TECHNOLOGY",
+#                     "SCIENCE",
+#                     "SCIENCE ADVANCES",
+#                     "SCIENCE OF THE TOTAL ENVIRONMENT",
+#                     "SCIENTIFIC DATA",
+#                     "SUSTAINABLE CITIES AND SOCIETY",
+#                     "SUSTAINABLE MATERIALS AND TECHNOLOGIES",
+#                     "SUSTAINABLE PRODUCTION AND CONSUMPTION",
+#                     "THE AMERICAN NATURALIST",
+#                     "THE INTERNATIONAL JOURNAL OF LIFE CYCLE ASSESSMENT",
+#                     "THE ISME JOURNAL",
+#                     "THE LANCET PLANETARY HEALTH",
+#                     "TRENDS IN ECOLOGY & EVOLUTION",
+#                     "WASTE MANAGEMENT",
+#                     "WATER RESEARCH",
+#                 ],
+#             },
+#             "created_at": {
+#                 "title": "Date Filter",
+#                 "description": 'Date extracted for a vector database semantic search, in MongoDB\'s query and projection operators, in format like {"$gte": 1609459200.0, "$lte": 1640908800.0}',
+#                 "type": "string",
+#             },
+#         },
+#         "required": ["query"],
+#     }
+
+#     prompt_func_calling_msgs = [
+#         SystemMessage(
+#             content="You are a world-class algorithm for extracting the next query and filters for searching from a chat history. Make sure to answer in the correct structured format."
+#         ),
+#         HumanMessage(content="The chat history:"),
+#         HumanMessagePromptTemplate.from_template("{input}"),
+#     ]
+
+#     prompt_func_calling = ChatPromptTemplate(messages=prompt_func_calling_msgs)
+
+#     llm_func_calling = ChatOpenAI(model_name=llm_model, temperature=0, streaming=False)
+
+#     func_calling_chain = prompt_func_calling | llm_func_calling.with_structured_output(
+#         func_calling_json_schema
+#     )
+
+#     return func_calling_chain
+
+
+# def search_pinecone(query: str, filters: dict = {}, top_k: int = 16):
+#     """
+#     Performs a similarity search on Pinecone's vector database based on a given query and optional date filter, and returns a list of relevant documents.
+
+#     :param query: The query to be used for similarity search in Pinecone's vector database.
+#     :type query: str
+#     :param created_at: The date filter to be applied in the search, specified in a format compatible with Pinecone's filtering options.
+#     :type created_at: str or None
+#     :param top_k: The number of top matching documents to return. Defaults to 16.
+#     :type top_k: int or None
+#     :returns: A list of dictionaries, each containing the content and source of the matched documents. The function returns an empty list if 'top_k' is set to 0.
+#     :rtype: list of dicts
+
+#     Function Behavior:
+#         - Initializes Pinecone with the specified API key and environment.
+#         - Conducts a similarity search based on the provided query and optional date filter.
+#         - Extracts and formats the relevant document information before returning.
+
+#     Exceptions:
+#         - This function relies on Pinecone and Python's os library. Exceptions could propagate if there are issues related to API keys, environment variables, or Pinecone initialization.
+#         - TypeError could be raised if the types of 'query', 'created_at', or 'top_k' do not match the expected types.
+
+#     Note:
+#         - Ensure the Pinecone API key and environment variables are set before running this function.
+#         - The function uses 'OpenAIEmbeddings' to initialize Pinecone's vector store, which should be compatible with the embeddings in the Pinecone index.
+#     """
+
+#     if top_k == 0:
+#         return []
+
+#     embeddings = OpenAIEmbeddings(model=os.environ["PINECONE_EMBEDDING_MODEL"])
+
+#     vectorstore = PineconeVectorStore(embedding=embeddings, namespace="sci")
+
+#     if filters:
+#         docs = vectorstore.similarity_search(query, k=top_k, filter=filters)
+#     else:
+#         docs = vectorstore.similarity_search(query, k=top_k)
+
+#     doi_set = set()
+#     for doc in docs:
+#         doi_set.add(doc.metadata["doi"])
+
+#     xata_docs = XataClient(
+#         api_key=os.environ["XATA_DOCS_API_KEY"], db_url=os.environ["XATA_DOCS_URL"]
+#     )
+
+#     xata_response = xata_docs.data().query(
+#         "journals",
+#         {
+#             "columns": ["doi", "title", "authors"],
+#             "filter": {
+#                 "doi": {"$any": list(doi_set)},
+#             },
+#         },
+#     )
+#     records = xata_response.get("records", [])
+#     records_dict = {record["doi"]: record for record in records}
+
+#     docs_list = []
+#     for doc in docs:
+#         try:
+#             record = records_dict.get(doc.metadata["doi"], {})
+#             authors = ", ".join(record["authors"]) if record.get("authors") else ""
+#             date = datetime.fromtimestamp(doc.metadata["date"])
+#             formatted_date = date.strftime("%Y-%m")  # Format date as 'YYYY-MM'
+#             url = "https://doi.org/{}".format(doc.metadata["doi"])
+#             source_entry = "[{}. {}. {}. {}.]({})".format(
+#                 record["title"],
+#                 doc.metadata["journal"],
+#                 authors,
+#                 formatted_date,
+#                 url,
+#             )
+#             docs_list.append({"content": doc.page_content, "source": source_entry})
+
+#             # date = datetime.fromtimestamp(doc.metadata["created_at"])
+#             # formatted_date = date.strftime("%Y-%m")  # Format date as 'YYYY-MM'
+#             # source_entry = "[{}. {}. {}. {}.]({})".format(
+#             #     doc.metadata["source_id"],
+#             #     doc.metadata["source"],
+#             #     doc.metadata["author"],
+#             #     formatted_date,
+#             #     doc.metadata["url"],
+#             # )
+#             # docs_list.append({"content": doc.page_content, "source": source_entry})
+#         except:
+#             docs_list.append(
+#                 {"content": doc.page_content, "source": doc.metadata["source"]}
+#             )
+
+#     return docs_list
+
+# def search_sci_service(query: str, filters: dict = {}, top_k: int = 10):
+
+#     url = os.environ["END_POINT"] + "sci_search"
+#     headers = {
+#         "Content-Type": "application/json",
+#         "Authorization": f"Bearer {os.environ['REMOTE_BEARER_TOKEN']}",
+#         "email": os.environ["EMAIL"],
+#         "password": os.environ["PW"],
+#         "x-region": os.environ["X_REGION"]
+#     }
+
+#     request_body = {
+#         "query": query,
+#         "topK": top_k
+#     }
+
+#     if filters:
+#         request_body["filter"] = filters
+
+#     # try:
+#     response = requests.post(url, headers=headers, json=request_body)
+#     response.raise_for_status()
+#     docs_list = response.json()
+#     return docs_list
+
+# def search_internet(query, top_k=4):
+#     """
+#     Performs an internet search based on the provided query using the DuckDuckGo search engine and returns a list of top results.
+
+#     :param query: The query string for the internet search.
+#     :type query: str
+#     :param top_k: The maximum number of top results to return. Defaults to 4.
+#     :type top_k: int or None.
+#     :returns: A list of dictionaries, each containing the snippet, title, and link of a search result. The function returns an empty list if 'top_k' is set to 0.
+#     :rtype: list of dicts
+
+#     Function Behavior:
+#         - Uses the DuckDuckGoSearchResults class to perform the search.
+#         - Parses the raw search results to extract relevant snippet, title, and link information.
+#         - Structures this information into a list of dictionaries and returns it.
+
+#     Exceptions:
+#         - This function relies on the DuckDuckGoSearchResults class, so exceptions might propagate from issues in that dependency.
+#         - TypeError could be raised if the types of 'query' or 'top_k' do not match the expected types.
+#     """
+
+#     if top_k == 0:
+#         return []
+
+#     search = DuckDuckGoSearchResults(num_results=top_k)
+
+#     results = search.run(query)
+
+#     pattern = r"\[snippet: (.*?), title: (.*?), link: (.*?)\]"
+#     matches = re.findall(pattern, results)
+
+#     docs = [
+#         {"snippet": match[0], "title": match[1], "link": match[2]} for match in matches
+#     ]
+
+#     docs_list = []
+
+#     for doc in docs:
+#         docs_list.append(
+#             {
+#                 "content": doc["snippet"],
+#                 "source": "[{}]({})".format(doc["title"], doc["link"]),
+#             }
+#         )
+
+#     return docs_list

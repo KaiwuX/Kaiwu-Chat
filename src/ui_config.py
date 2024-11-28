@@ -43,10 +43,11 @@ class UI:
     sidebar_welcome_text: str
     sidebar_markdown: str
     sidebar_expander_title: str
-    search_knowledge_base_checkbox_label: str
+    search_journal_paper_checkbox_label: str
     search_internet_checkbox_label: str
-    search_wikipedia_checkbox_label: str
-    search_arxiv_checkbox_label: str
+    search_report_checkbox_label: str
+    search_standard_checkbox_label: str
+    search_patent_checkbox_label: str
     search_docs_checkbox_label: str
     search_docs_options: str
     search_docs_options_isolated: str

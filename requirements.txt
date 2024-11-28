@@ -1,13 +1,10 @@
-duckduckgo-search
 langchain
 langchain_community
 langchain-openai
-langchain-pinecone
 openai
-pinecone-client
+pytz
 requests
 streamlit
 tiktoken
 toml
 xata
-pytz

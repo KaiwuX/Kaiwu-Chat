@@ -21,6 +21,7 @@ from utils import (
     get_begin_datetime,
     initialize_messages,
     main_chain,
+    func_calling_chain,
     random_email,
     concurrent_search_service,
     xata_chat_history,
@@ -393,18 +394,18 @@ if "logged_in" in st.session_state:
                             or search_patent 
                             or search_standard
                         ):
-                            # formatted_messages = str(
-                            #     [
-                            #         (msg["role"], msg["content"])
-                            #         for msg in st.session_state["messages"][1:]
-                            #     ]
-                            # )
+                            formatted_messages = str(
+                                [
+                                    (msg["role"], msg["content"])
+                                    for msg in st.session_state["messages"][1:]
+                                ]
+                            )
 
-                            # func_calling_response = func_calling_chain().invoke(
-                            #     {"input": formatted_messages}
-                            # )
+                            func_calling_response = func_calling_chain().invoke(
+                                {"input": formatted_messages}
+                            )
 
-                            # query = func_calling_response.get("query")
+                            query = func_calling_response.get("query")
 
                             # try:
                             #     created_at = json.loads(
@@ -432,7 +433,7 @@ if "logged_in" in st.session_state:
                             # docs_response.extend(
                             #     search_internet(query, top_k=3)
                             # )
-                            docs_response = asyncio.run(concurrent_search_service(urls=search_list,query=user_query))
+                            docs_response = asyncio.run(concurrent_search_service(urls=search_list,query=query))
 
                             input = f"""Must Follow:
 - Respond to "{user_query}" by using information from "{docs_response}" (if available) and your own knowledge to provide a logical, clear, and critically analyzed reply in the same language.

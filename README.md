@@ -7,12 +7,12 @@
 
 [Tutorial](https://code.visualstudio.com/docs/devcontainers/tutorial)
 
-Python 3 -> Additional Options -> 3.11-bullseye -> ZSH Plugins (Last One) -> Trust @devcontainers-contrib -> Keep Defaults
+Python 3 -> Additional Options -> 3.12-bullseye -> ZSH Plugins (Last One) -> Trust @devcontainers-contrib -> Keep Defaults
 
 Setup `venv`:
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -27,7 +27,7 @@ pip freeze > requirements_freeze.txt
 ```
 
 ```bash
-sudo apt install python3.11-dev
+sudo apt install python3.12-dev
 ```
 
 ## Start
@@ -65,7 +65,7 @@ aws ecs describe-task-definition --task-definition langserve:8
 aws ecs describe-tasks --cluster production --tasks cb72b1cf0ee240b3b3820f3e9431cb7c
 
 
-
+docker run -d -p 80:80 -e ui=kaiwu-en 339712838008.dkr.ecr.us-east-1.amazonaws.com/kaiwu-chat:0.0.1
 ```
 
 ### Nginx config

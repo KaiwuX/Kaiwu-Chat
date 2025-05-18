@@ -6,7 +6,6 @@ from datetime import datetime
 
 import streamlit as st
 from langchain.schema import AIMessage, HumanMessage
-from streamlit.web.server.websocket_headers import _get_websocket_headers
 
 import ui_config
 import utils
@@ -61,8 +60,8 @@ if "username" not in st.session_state or st.session_state["username"] is None:
                 st.session_state["username"] = random_email()
         elif ui.need_fixed_passwd is False:
             auth = False
-            st.session_state["username"] = _get_websocket_headers().get(
-                "Username", None
+            st.session_state["username"] = st.context.headers.get(
+                "Username"
             )
             if st.session_state["username"] is not None:
                 auth = True

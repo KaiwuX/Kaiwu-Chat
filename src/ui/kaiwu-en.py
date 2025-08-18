@@ -96,8 +96,8 @@ ui_data = {
     <span style='font-size: 12px;padding-left:20px;'>**[开始之前：重要提示!](https://www.kaiwu.info/zh/learning)**</span><br />
     <span style='font-size: 14px;'>💾 Activate data sources to retrieve.</span><br />
     <span style='font-size: 12px;padding-left:20px;'>打开所需的信息来源。</span><br />
-    <span style='font-size: 14px;'>💡 Work as ChatGPT (GPT-4.1) if no source is active.</span><br />
-    <span style='font-size: 12px;padding-left:20px;'>关闭所有来源就是ChatGPT的GPT-4.1。</span>
+    <span style='font-size: 14px;'>💡 Work as ChatGPT (GPT-5) if no source is active.</span><br />
+    <span style='font-size: 12px;padding-left:20px;'>关闭所有来源就是ChatGPT的GPT-5。</span>
     """,
     "current_chat_title": "Chat History :",
     "chat_ai_avatar": "src/static/kaiwu/logo.png",

@@ -326,7 +326,7 @@ def main_chain():
 
     llm_chat = ChatOpenAI(
         model=llm_model,
-        temperature=0,
+        # temperature=0,
         streaming=True,
         verbose=langchain_verbose,
     )
